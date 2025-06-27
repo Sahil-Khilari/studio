@@ -1,6 +1,7 @@
 "use client";
 
 import { usePathname } from 'next/navigation';
+import Link from 'next/link';
 import { Sidebar, SidebarContent, SidebarHeader, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarFooter } from "@/components/ui/sidebar";
 import { Cloud, File, Star, Clock, Trash2, Settings, HardDrive, Database } from 'lucide-react';
 import { Progress } from '../ui/progress';
@@ -29,12 +30,14 @@ export function SidebarNav() {
           {navItems.map((item) => (
             <SidebarMenuItem key={item.label}>
               <SidebarMenuButton 
-                href={item.href}
+                asChild
                 isActive={pathname.startsWith(item.href)}
                 tooltip={item.label}
               >
-                <item.icon />
-                {item.label}
+                <Link href={item.href}>
+                  <item.icon />
+                  <span>{item.label}</span>
+                </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
           ))}
