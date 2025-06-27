@@ -11,7 +11,7 @@ import { useAuth } from './auth-context';
 import { CloudItem, BreadcrumbItem, CloudFolder, CloudFile } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { createNewFolderAction } from '@/lib/actions';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 
 interface FileContextType {
   items: CloudItem[];
@@ -36,6 +36,7 @@ export const FileProvider = ({ children }: { children: ReactNode }) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
+  const pathname = usePathname();
 
   const [items, setItems] = useState<CloudItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -74,36 +75,58 @@ export const FileProvider = ({ children }: { children: ReactNode }) => {
   }, [user, currentFolderId, toast]);
 
   const navigateTo = useCallback(async (folderId: string | null, folderName?: string) => {
-    if (folderId === 'root' || folderId === null) {
-      setCurrentFolderId(null);
-      setPath([{ id: 'root', name: 'My Files' }]);
-      router.push('/my-files');
+    const targetFolderId = folderId === 'root' ? null : folderId;
+    const newRoute = targetFolderId ? `/my-files/${targetFolderId}` : '/my-files';
+    
+    // Only navigate if the URL isn't already the target. This breaks the infinite loop.
+    if (pathname !== newRoute) {
+      router.push(newRoute);
+    }
+    
+    // Avoid re-processing if context is already on the correct folder.
+    if (targetFolderId === currentFolderId) {
       return;
     }
 
-    // Find the index of the folder in the current path
-    const folderIndex = path.findIndex(p => p.id === folderId);
-
-    if (folderIndex !== -1) {
-      // If folder is in the path, truncate the path
-      setPath(prevPath => prevPath.slice(0, folderIndex + 1));
-    } else {
-      // If not in path, it's a new subfolder, so add it
-      if (folderName) {
-         setPath(prevPath => [...prevPath, { id: folderId, name: folderName }]);
-      } else {
-        // Fetch folder name if not provided
-        const folderDoc = await getDoc(doc(db, 'files', folderId));
-        if (folderDoc.exists()) {
-          setPath(prevPath => [...prevPath, { id: folderId, name: folderDoc.data().name }]);
-        }
-      }
+    if (targetFolderId === null) {
+      setCurrentFolderId(null);
+      setPath([{ id: 'root', name: 'My Files' }]);
+      return;
     }
     
-    setCurrentFolderId(folderId);
-    const newPath = folderId === 'root' ? '' : `/my-files/${folderId}`;
-    router.push(newPath);
-  }, [path, router]);
+    setCurrentFolderId(targetFolderId);
+
+    // On deep link or refresh, path isn't built sequentially. 
+    // Reconstruct the breadcrumb path from the folder's stored path.
+    try {
+      const folderDoc = await getDoc(doc(db, 'files', targetFolderId));
+      if (folderDoc.exists()) {
+        const folderData = folderDoc.data();
+        const breadcrumbPath: BreadcrumbItem[] = [{ id: 'root', name: 'My Files' }];
+        const pathIds = (folderData.path || []).filter((id: string | null) => id && id !== 'root');
+
+        if (pathIds.length > 0) {
+          const pathDocs = await Promise.all(pathIds.map((id: string) => getDoc(doc(db, 'files', id))));
+          pathDocs.forEach(docSnap => {
+            if (docSnap.exists()) {
+              breadcrumbPath.push({ id: docSnap.id, name: docSnap.data().name });
+            }
+          });
+        }
+        breadcrumbPath.push({ id: targetFolderId, name: folderData.name });
+        setPath(breadcrumbPath);
+      } else {
+        toast({ variant: 'destructive', title: 'Error', description: 'Folder not found.' });
+        router.push('/my-files');
+        setCurrentFolderId(null);
+        setPath([{ id: 'root', name: 'My Files' }]);
+      }
+    } catch (e) {
+      console.error("Error building path:", e);
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to load folder path.' });
+      router.push('/my-files');
+    }
+  }, [router, pathname, currentFolderId, toast]);
 
   const createFolder = async (folderName: string) => {
     if (!user) return;
@@ -137,8 +160,8 @@ export const FileProvider = ({ children }: { children: ReactNode }) => {
     try {
       await deleteDoc(itemRef);
       if (item.type === 'file') {
-        const fileRef = ref(storage, (item as CloudFile).url);
-        await deleteObject(fileRef).catch(err => console.error("Error deleting from storage, maybe already deleted:", err));
+        const fileStorageRef = ref(storage, (item as CloudFile).url);
+        await deleteObject(fileStorageRef).catch(err => console.error("Error deleting from storage, maybe already deleted:", err));
       }
       toast({ title: "Success", description: `"${item.name}" was permanently deleted.`});
     } catch (error) {
