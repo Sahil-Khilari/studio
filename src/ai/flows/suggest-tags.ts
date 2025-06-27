@@ -3,21 +3,21 @@
 /**
  * @fileOverview This file defines a Genkit flow for suggesting relevant tags for files.
  *
- * - suggestTagsFlow - A function that takes a file name and an optional description and suggests relevant tags.
- * - SuggestTagsInput - The input type for the suggestTagsFlow function.
- * - SuggestTagsOutput - The output type for the suggestTagsFlow function.
+ * - suggestTags - A function that takes a file name and an optional description and suggests relevant tags.
+ * - SuggestTagsInput - The input type for the suggestTags function.
+ * - SuggestTagsOutput - The output type for the suggestTags function.
  */
 
 import {ai} from '@/ai/genkit';
-import {z} from 'genkit/zod';
+import { z } from 'zod';
 
-export const SuggestTagsInputSchema = z.object({
+const SuggestTagsInputSchema = z.object({
   fileName: z.string().describe('The name of the file.'),
   description: z.string().optional().describe('An optional user-provided description of the file.'),
 });
 export type SuggestTagsInput = z.infer<typeof SuggestTagsInputSchema>;
 
-export const SuggestTagsOutputSchema = z.object({
+const SuggestTagsOutputSchema = z.object({
   tags: z.array(z.string()).describe('An array of 3-5 suggested tags for the file. Tags should be concise, relevant, and in lowercase.'),
 });
 export type SuggestTagsOutput = z.infer<typeof SuggestTagsOutputSchema>;
@@ -43,7 +43,7 @@ Generate tags that will be useful for searching and filtering. For example, if a
 });
 
 
-export const suggestTagsFlow = ai.defineFlow(
+const suggestTagsFlow = ai.defineFlow(
   {
     name: 'suggestTagsFlow',
     inputSchema: SuggestTagsInputSchema,
