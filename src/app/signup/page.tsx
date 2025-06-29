@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { createUserWithEmailAndPassword , signInWithPopup , GoogleAuthProvider , GithubAuthProvider } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useAuth } from '@/context/auth-context';
 import { Button } from "@/components/ui/button";
@@ -59,7 +59,7 @@ export default function SignupPage() {
   const handleGoogleSignIn = async () => {
     setSocialLoading('google');
     try {
-      await signInWithGoogle();
+      await signInWithPopup(auth, new GoogleAuthProvider());
     } catch (err: any) {
       setError(err.message);
       setSocialLoading(null);
@@ -69,7 +69,7 @@ export default function SignupPage() {
   const handleGithubSignIn = async () => {
     setSocialLoading('github');
     try {
-      await signInWithGithub();
+      await signInWithPopup(auth, new GithubAuthProvider());
     } catch (err: any) {
       setError(err.message);
       setSocialLoading(null);
